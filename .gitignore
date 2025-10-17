@@ -1,0 +1,18 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+
+# local data & outputs
+.env
+data/*.csv
+data/*.parquet
+reports/
+.backups/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
