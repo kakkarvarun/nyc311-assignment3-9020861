@@ -4,6 +4,8 @@ import pymysql
 from dotenv import load_dotenv
 import psutil
 import argparse
+import json
+
 
 USECOLS = [
     "Unique Key","Created Date","Closed Date","Agency","Agency Name",
@@ -62,8 +64,25 @@ def start_log(conn, month_key, source_file):
 
 def finish_log(conn, month_key, rows, status, details=None):
     sql = "UPDATE ingestion_log SET finished_at=NOW(), row_count=%s, status=%s, details=%s WHERE month_key=%s"
-    with conn.cursor() as cur: cur.execute(sql, (rows, status, details, month_key))
+
+    # Ensure the JSON column gets valid JSON
+    if details is None:
+        payload = None  # store NULL
+    elif isinstance(details, str):
+        # If you pass in a string, try to make it valid JSON string; otherwise wrap it
+        try:
+            json.loads(details)  # is it already JSON?
+            payload = details
+        except json.JSONDecodeError:
+            payload = json.dumps({"message": details})
+    else:
+        # dict or list → proper JSON
+        payload = json.dumps(details)
+
+    with conn.cursor() as cur:
+        cur.execute(sql, (rows, status, payload, month_key))
     conn.commit()
+
 
 def delete_month(conn, month_key):
     with conn.cursor() as cur: cur.execute("DELETE FROM service_requests WHERE month_key=%s", (month_key,))
@@ -176,11 +195,16 @@ def main():
             if remaining is not None and remaining <= 0:
                 break
 
-        finish_log(conn, args.month, total, "success",
-                   f"duration={round(time.time()-t0,2)}s,chunksize={args.chunksize},batch={args.batch}")
+        finish_log(conn, args.month, total, "success", {
+            "duration_sec": round(time.time() - t0, 2),
+            "chunksize": args.chunksize,
+            "batch": args.batch,
+            "inserted": total
+        })
+
         print(f"[done] rows={total}")
     except Exception as e:
-        finish_log(conn, args.month, total, "failed", str(e))
+        finish_log(conn, args.month, total, "failed", {"error": str(e)})
         print("ETL FAILED:", e)
         sys.exit(1)
     finally:
