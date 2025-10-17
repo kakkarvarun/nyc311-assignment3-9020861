@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head><title>Results</title></head>
+<body>
+  <h1>Results</h1>
+  <p>Total: {{ total }}</p>
+  {% if rows %}
+  <table border="1" cellpadding="4">
+    <tr>
+      <th>Request ID</th><th>Created</th><th>Borough</th>
+      <th>Complaint</th><th>Descriptor</th><th>Status</th>
+    </tr>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.request_id }}</td>
+        <td>{{ r.created_datetime }}</td>
+        <td>{{ r.borough }}</td>
+        <td>{{ r.complaint_type }}</td>
+        <td>{{ r.descriptor }}</td>
+        <td>{{ r.status }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+  <p>
+    Page {{ page }} of {{ pages }}
+    {% if page > 1 %}
+      <a href="/search?start={{start}}&end={{end}}&borough={{borough}}&complaint={{complaint}}&page={{page-1}}">Prev</a>
+    {% endif %}
+    {% if page < pages %}
+      <a href="/search?start={{start}}&end={{end}}&borough={{borough}}&complaint={{complaint}}&page={{page+1}}">Next</a>
+    {% endif %}
+  </p>
+  {% else %}
+    <p><strong>No results</strong></p>
+  {% endif %}
+  <p><a href="/">New search</a></p>
+</body>
+</html>

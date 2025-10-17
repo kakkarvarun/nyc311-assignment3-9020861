@@ -1,1 +1,22 @@
-<!-- HTML template placeholder -->
+<!doctype html>
+<html>
+<head><title>NYC 311 Search</title></head>
+<body>
+  <h1>NYC 311 Search</h1>
+  <form action="/search" method="get">
+    <label>Start date: <input type="date" name="start" required></label>
+    <label>End date: <input type="date" name="end" required></label>
+    <label>Borough:
+      <select name="borough">
+        <option value="">(Any)</option>
+        <option>BRONX</option><option>BROOKLYN</option>
+        <option>MANHATTAN</option><option>QUEENS</option>
+        <option>STATEN ISLAND</option><option>UNKNOWN</option>
+      </select>
+    </label>
+    <label>Complaint contains: <input type="text" name="complaint" placeholder="e.g., Noise"></label>
+    <button type="submit">Search</button>
+  </form>
+  <p><a href="/aggregate/borough">Complaints per Borough</a></p>
+</body>
+</html>

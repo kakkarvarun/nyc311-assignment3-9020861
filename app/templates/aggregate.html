@@ -1,1 +1,14 @@
-<!-- Aggregate view placeholder -->
+<!doctype html>
+<html>
+<head><title>{{ title }}</title></head>
+<body>
+  <h1>{{ title }}</h1>
+  <table border="1" cellpadding="4">
+    <tr><th>Borough</th><th>Total</th></tr>
+    {% for row in agg %}
+      <tr><td>{{ row.borough }}</td><td>{{ row.total }}</td></tr>
+    {% endfor %}
+  </table>
+  <p><a href="/">Back</a></p>
+</body>
+</html>
