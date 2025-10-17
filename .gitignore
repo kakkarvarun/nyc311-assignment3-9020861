@@ -9,7 +9,6 @@ __pycache__/
 .env
 data/*.csv
 data/*.parquet
-reports/
 .backups/
 
 # OS/editor
