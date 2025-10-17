@@ -8,36 +8,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    # 1) Put ALL values here first (including secrets)…
+    # Make ALL values available to every step
     env:
-      # non-secrets from repo Variables
-      DB_HOST: ${{ vars.DB_HOST }}
-      DB_PORT: ${{ vars.DB_PORT }}
-      DB_NAME: ${{ vars.DB_NAME }}
-      APP_DB_USER: ${{ vars.APP_DB_USER }}
+      # repo Variables
+      DB_HOST: ${{ vars.DB_HOST }}           # usually 127.0.0.1
+      DB_PORT: ${{ vars.DB_PORT }}           # 3306
+      DB_NAME: ${{ vars.DB_NAME }}           # nyc311
+      APP_DB_USER: ${{ vars.APP_DB_USER }}   # appuser
 
-      # secrets from repo Secrets
+      # repo Secrets
       APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
       MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
 
-      # convenience for the app/etl which read DB_USER/DB_PASSWORD
+      # convenience for the app/etl code that uses DB_USER/DB_PASSWORD
       DB_USER: ${{ vars.APP_DB_USER }}
       DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
-
-    # 2) …then reference them as env.* everywhere else
-    services:
-      mysql:
-        image: mysql:8
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ env.MYSQL_ROOT_PASSWORD }}
-          MYSQL_DATABASE: ${{ env.DB_NAME }}
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -p${{ env.MYSQL_ROOT_PASSWORD }}"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
 
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +32,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install OS deps (Chrome + MySQL client)
+      - name: Install OS deps (Chrome + MySQL client + Docker CLI already present)
         run: |
           sudo apt-get update
           sudo apt-get install -y wget gnupg default-mysql-client
@@ -62,9 +47,18 @@ jobs:
           pip install -r requirements.txt
           pip install python-dotenv psutil pymysql pytest selenium webdriver-manager
 
+      # 🔧 Start MySQL as a background container (using env + secrets safely)
+      - name: Start MySQL (Docker)
+        run: |
+          docker rm -f ci-mysql 2>/dev/null || true
+          docker run -d --name ci-mysql -p 3306:3306 \
+            -e MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD}" \
+            -e MYSQL_DATABASE="${DB_NAME}" \
+            mysql:8
+
       - name: Wait for MySQL
         run: |
-          for i in {1..30}; do
+          for i in {1..40}; do
             mysql -h ${{ env.DB_HOST }} -uroot -p"${{ env.MYSQL_ROOT_PASSWORD }}" -e "SELECT 1" && break
             sleep 2
           done
