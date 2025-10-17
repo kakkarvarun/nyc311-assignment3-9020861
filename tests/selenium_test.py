@@ -1,13 +1,14 @@
 import os, time
 import pytest
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.support.ui import Select
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+
 
 
 BASE_URL = os.getenv("APP_URL", "http://localhost:5000")
@@ -41,10 +42,14 @@ def test_positive_search(driver):
 
     driver.find_element(By.CSS_SELECTOR, "button[type=submit]").click()
 
-    # Wait for the page to render
-    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-    assert "Results" in driver.page_source
-    assert "No results" not in driver.page_source
+# Wait for real navigation to /search (more reliable in headless)
+WebDriverWait(driver, 10).until(EC.url_contains("/search"))
+# Optional: also ensure the Results header has rendered
+WebDriverWait(driver, 10).until(EC.text_to_be_present_in_element((By.TAG_NAME, "h1"), "Results"))
+
+assert "Results" in driver.page_source
+assert "No results" not in driver.page_source
+
 
 
 def test_negative_search(driver):
@@ -60,8 +65,11 @@ def test_negative_search(driver):
 
     driver.find_element(By.CSS_SELECTOR, "button[type=submit]").click()
 
-    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-    assert "No results" in driver.page_source
+WebDriverWait(driver, 10).until(EC.url_contains("/search"))
+WebDriverWait(driver, 10).until(EC.text_to_be_present_in_element((By.TAG_NAME, "h1"), "Results"))
+
+assert "No results" in driver.page_source
+
 
 
 def test_aggregate(driver):
