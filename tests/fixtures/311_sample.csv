@@ -1,1 +1,4 @@
-Unique Key,Created Date,Closed Date,Agency,Complaint Type,Descriptor,Borough,Latitude,Longitude
+Unique Key,Created Date,Closed Date,Agency,Agency Name,Complaint Type,Descriptor,Borough,City,Latitude,Longitude,Status,Resolution Description
+60000001,2023-01-05 10:15:00,2023-01-06 09:00:00,NYPD,Police Department,Noise,Noise: Loud Music/Party,BROOKLYN,BROOKLYN,40.6782,-73.9442,Closed,Resolved
+60000002,2023-01-05 11:00:00,,DOT,Department of Transportation,Street Condition,Pothole,MANHATTAN,NEW YORK,40.7831,-73.9712,Open,
+60000003,2023-01-10 14:22:00,2023-01-12 08:00:00,DSNY,Sanitation,Dirty Conditions,Sidewalk Dirty,QUEENS,QUEENS,40.7282,-73.7949,Closed,Addressed
