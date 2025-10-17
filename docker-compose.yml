@@ -1,18 +1,29 @@
-version: '3.9'
 services:
   db:
-    image: mysql:8.0
+    image: mysql:8
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
-  app:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
+      - ./db/init/01-create-app-user.sh:/docker-entrypoint-initdb.d/01-create-app-user.sh:ro
+
+  web:
     build: .
+    env_file: .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${APP_DB_USER}
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - ./:/app
     ports:
       - "5000:5000"
-    volumes:
-      - .:/app
     depends_on:
       - db
