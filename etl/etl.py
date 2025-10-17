@@ -163,21 +163,29 @@ def main():
                 if len(df) > remaining: df = df.iloc[:remaining]
                 remaining -= len(df)
 
-            tuples = [
-                (int(r.request_id), r.created_datetime, r.closed_datetime,
-                 (r.agency if pd.notna(r.agency) else None),
-                 (r.agency_name if pd.notna(r.agency_name) else None),
-                 (r.complaint_type if pd.notna(r.complaint_type) else "UNKNOWN"),
-                 (r.descriptor if pd.notna(r.descriptor) else None),
-                 (r.borough if pd.notna(r.borough) else "UNKNOWN"),
-                 (r.city if pd.notna(r.city) else None),
-                 (float(r.latitude) if not pd.isna(r.latitude) else None),
-                 (float(r.longitude) if not pd.isna(r.longitude) else None),
-                 (r.status if pd.notna(r.status) else None),
-                 (r.resolution_description if pd.notna(r.resolution_description) else None),
-                 r.month_key)
-                for r in df.itertuples(index=False)
-            ]
+            tuples = []
+            for r in df.itertuples(index=False):
+                # Convert datetimes safely (NaT -> None)
+                created_dt = r.created_datetime.to_pydatetime() if pd.notna(r.created_datetime) else None
+                closed_dt  = r.closed_datetime.to_pydatetime() if pd.notna(r.closed_datetime) else None
+
+                tuples.append((
+                    int(r.request_id),
+                    created_dt,
+                    closed_dt,
+                    (r.agency if pd.notna(r.agency) else None),
+                    (r.agency_name if pd.notna(r.agency_name) else None),
+                    (r.complaint_type if pd.notna(r.complaint_type) else "UNKNOWN"),
+                    (r.descriptor if pd.notna(r.descriptor) else None),
+                    (r.borough if pd.notna(r.borough) else "UNKNOWN"),
+                    (r.city if pd.notna(r.city) else None),
+                    (float(r.latitude) if not pd.isna(r.latitude) else None),
+                    (float(r.longitude) if not pd.isna(r.longitude) else None),
+                    (r.status if pd.notna(r.status) else None),
+                    (r.resolution_description if pd.notna(r.resolution_description) else None),
+                    r.month_key
+            ))
+
 
             for j in range(0, len(tuples), args.batch):
                 batch = tuples[j:j+args.batch]
