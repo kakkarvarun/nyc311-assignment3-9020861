@@ -1,4 +1,5 @@
 name: CI
+
 on:
   push:
   pull_request:
@@ -6,24 +7,37 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    # 1) Put ALL values here first (including secrets)…
     env:
+      # non-secrets from repo Variables
       DB_HOST: ${{ vars.DB_HOST }}
       DB_PORT: ${{ vars.DB_PORT }}
       DB_NAME: ${{ vars.DB_NAME }}
+      APP_DB_USER: ${{ vars.APP_DB_USER }}
+
+      # secrets from repo Secrets
+      APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+      MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+
+      # convenience for the app/etl which read DB_USER/DB_PASSWORD
       DB_USER: ${{ vars.APP_DB_USER }}
       DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
 
+    # 2) …then reference them as env.* everywhere else
     services:
       mysql:
         image: mysql:8
         env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-          MYSQL_DATABASE: ${{ vars.DB_NAME }}
+          MYSQL_ROOT_PASSWORD: ${{ env.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ env.DB_NAME }}
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -p${{ secrets.MYSQL_ROOT_PASSWORD }}"
-          --health-interval=10s --health-timeout=5s --health-retries=10
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -p${{ env.MYSQL_ROOT_PASSWORD }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - uses: actions/checkout@v4
@@ -51,25 +65,29 @@ jobs:
       - name: Wait for MySQL
         run: |
           for i in {1..30}; do
-            mysql -h ${{ env.DB_HOST }} -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" -e "SELECT 1" && break
+            mysql -h ${{ env.DB_HOST }} -uroot -p"${{ env.MYSQL_ROOT_PASSWORD }}" -e "SELECT 1" && break
             sleep 2
           done
 
       - name: Load schema
         run: |
-          mysql -h ${{ env.DB_HOST }} -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" < db/schema.sql
+          mysql -h ${{ env.DB_HOST }} -uroot -p"${{ env.MYSQL_ROOT_PASSWORD }}" < db/schema.sql
 
       - name: Create least-privileged app user
         run: |
-          mysql -h ${{ env.DB_HOST }} -uroot -p"${{ secrets.MYSQL_ROOT_PASSWORD }}" <<'SQL'
-          CREATE USER IF NOT EXISTS '${{ vars.APP_DB_USER }}'@'%' IDENTIFIED BY '${{ secrets.APP_DB_PASSWORD }}';
-          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER ON ${{ env.DB_NAME }}.* TO '${{ vars.APP_DB_USER }}'@'%';
+          mysql -h ${{ env.DB_HOST }} -uroot -p"${{ env.MYSQL_ROOT_PASSWORD }}" <<'SQL'
+          CREATE USER IF NOT EXISTS '${{ env.APP_DB_USER }}'@'%' IDENTIFIED BY '${{ env.APP_DB_PASSWORD }}';
+          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER ON ${{ env.DB_NAME }}.* TO '${{ env.APP_DB_USER }}'@'%';
           FLUSH PRIVILEGES;
           SQL
 
       - name: Run ETL on fixture
         run: |
-          python etl/etl.py --file tests/fixtures/311_sample.csv --month 2023-01 --chunksize 5000 --batch 1000
+          python etl/etl.py \
+            --file tests/fixtures/311_sample.csv \
+            --month 2023-01 \
+            --chunksize 5000 \
+            --batch 1000
 
       - name: Start Flask app
         run: |
