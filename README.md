@@ -1,67 +1,123 @@
-# Assignment 3 – NYC 311 Service Requests App
+# NYC 311 Service Requests – Data-Driven Web App
 
-This is the starter repository for Assignment 3.
+![CI](https://github.com/kakkarvarun/nyc311-assignment3-9020861/actions/workflows/ci.yml/badge.svg)
 
-## Getting Started
-1. Copy `.env.example` → `.env`.
-2. Run `docker compose up -d --build`.
-3. Load data into MySQL using `etl/etl.py`.
-4. Run Flask app at http://localhost:5000.
+Flask + MySQL web app that ingests a one-month slice of the **NYC 311 Service Requests** dataset, exposes a **search UI** (date range, borough, complaint filter) with **pagination**, and an **aggregate view** (“Complaints per Borough”). Includes a **chunked ETL** pipeline with cleaning + idempotency, **Selenium tests**, and **GitHub Actions CI**. No secrets in code — DB credentials are provided via environment variables and GitHub Secrets/Variables.
 
-## To Do
-- Implement ETL script with chunked loading.
-- Extend Flask app with search filters + aggregate view.
-- Write Selenium tests.
-- Configure GitHub Actions workflow.
+---
 
-# NYC 311 Service Requests App
+## Architecture (high-level)
+1. **ETL (Python/Pandas)** → chunked CSV → cleaned rows → MySQL (`service_requests`)  
+2. **MySQL schema** → PK + **two indexes** for filters; `ingestion_log` for idempotency & metrics  
+3. **Flask app** → search with pagination; aggregate; templates in `app/templates`  
+4. **Tests** → Selenium positive/negative/aggregate (headless in CI)  
+5. **CI/CD** → Start MySQL, load schema, run ETL on a tiny fixture, start Flask, run tests
 
-Flask + MySQL app to explore a single-month slice of NYC 311 with chunked ETL, indexes, pagination, aggregate view, Selenium tests, and GitHub Actions CI.
+---
 
-## Local (Docker)
+## Dataset
+- Source: [NYC 311 – Open Data NYC](https://data.cityofnewyork.us/Social-Services/erm2-nwe9)
+- **Use one month** (e.g., `2023-01`) to keep local runs fast.
+- Place CSV locally at `data/311_YYYY_MM.csv` (git-ignored).
+
+---
+
+## Quickstart (Local – Docker)
 ```bash
-cp .env.example .env     # set strong values for APP_DB_PASSWORD and MYSQL_ROOT_PASSWORD
+# 1) Create .env from example (do NOT commit your real secrets)
+cp .env.example .env
+# Set strong APP_DB_PASSWORD and MYSQL_ROOT_PASSWORD in .env
+
+# 2) Start services and build images
 docker compose up -d --build
 
-# ETL (load your month CSV, e.g., Jan 2023)
-docker compose cp data/311_2023_01.csv web:/app/data/311_2023_01.csv
-docker compose exec web python etl/etl.py --file data/311_2023_01.csv --month 2023-01
+# 3) Load one-month CSV via the bind mount path
+#    (example: January 2023)
+docker compose exec web python etl/etl.py --file /app/data/311_2023_01.csv --month 2023-01
 
-# App at http://localhost:5000
-Filters & Aggregates
+# 4) App is available at:
+#    http://localhost:5000
 
-Search by date range, borough, complaint contains, with pagination
-
-Aggregate: Complaints per Borough
+Search UI: filter by date range, borough, and complaint substring.
+Aggregate: /aggregate/borough for complaints per borough.
 
 Schema & Indexes
 
-Tables: service_requests, ingestion_log
+Tables:
 
-Indexes:
+service_requests (PK: request_id, created_datetime, borough, complaint_type, etc.)
+
+ingestion_log (idempotent month key, status, row_count, JSON details)
+
+Indexes (chosen to match filters/pagination):
 
 idx_created_datetime (created_datetime)
 
 idx_borough_type_date (borough, complaint_type, created_datetime)
 
+EXPLAIN confirms index usage for the search query:
+
+EXPLAIN
+SELECT request_id
+FROM service_requests
+WHERE borough='BROOKLYN'
+  AND complaint_type LIKE '%Noise%'
+  AND created_datetime BETWEEN '2023-01-01' AND '2023-01-31'
+ORDER BY created_datetime DESC
+LIMIT 20;
+
+
 ETL
 
-Chunked ingest (default 50k), batch insert (10k), idempotent per month_key
+Reads CSV in chunks (default 50k rows), inserts in batches (10k) with transactions.
 
-Telemetry prints rows/s, CPU%, Mem%, chunk-by-chunk
+Cleans/normalizes: parse timestamps, fill missing borough as UNKNOWN, drop invalid dates.
+
+Idempotent by month: deletes existing month before inserting; records metrics in ingestion_log with JSON details.
+
+Telemetry printed per chunk: rows/s, CPU%, Mem%.
+
+Run:
+
+docker compose exec web python etl/etl.py \
+  --file /app/data/311_2023_01.csv \
+  --month 2023-01 \
+  --chunksize 50000 \
+  --batch 10000
 
 Tests
 
+Selenium tests run locally and in CI (headless Chrome):
+
 pytest -q
+test_positive_search → has results for BROOKLYN + “Noise” in Jan 2023
 
-CI
+test_negative_search → no results for a deliberately impossible combo
 
-MySQL service + schema + least-privileged user from GitHub Secrets/Variables
+test_aggregate → aggregate page loads
 
-ETL on a tiny fixture; headless Selenium
+CI (GitHub Actions)
 
-No secrets in code or logs
+Workflow: .github/workflows/ci.yml
 
-Performance sample (replace with actual)
-Chunk	Batch	Rows	Duration (s)	Rows/s	CPU%	Mem%
-50,000	10,000	300,000	80	3,750	40	35
+Starts MySQL 8 via docker run
+
+Loads schema; creates least-privileged app user
+
+Runs ETL on tiny fixture: tests/fixtures/311_sample.csv
+
+Starts Flask app; runs headless Selenium tests
+
+Secrets/Variables required (Repo → Settings → Secrets and variables → Actions):
+
+Secrets: MYSQL_ROOT_PASSWORD, APP_DB_PASSWORD
+
+Variables: APP_DB_USER=appuser, DB_NAME=nyc311, DB_HOST=127.0.0.1, DB_PORT=3306
+
+Security
+
+No credentials in code or logs.
+
+Local: .env (git-ignored).
+
+CI: use GitHub Secrets and Variables.
