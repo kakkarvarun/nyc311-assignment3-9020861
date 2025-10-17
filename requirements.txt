@@ -1,0 +1,6 @@
+Flask
+pymysql
+SQLAlchemy
+pandas
+selenium
+webdriver-manager
