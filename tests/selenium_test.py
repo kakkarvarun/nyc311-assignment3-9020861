@@ -6,6 +6,9 @@ from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 
 BASE_URL = os.getenv("APP_URL", "http://localhost:5000")
 
@@ -25,24 +28,41 @@ def test_health(driver):
 
 def test_positive_search(driver):
     driver.get(f"{BASE_URL}/")
-    driver.find_element(By.NAME, "start").send_keys("2023-01-01")
-    driver.find_element(By.NAME, "end").send_keys("2023-01-31")
+
+    # Set <input type="date"> via JS (more reliable in headless)
+    driver.execute_script("document.querySelector('input[name=start]').value='2023-01-01'")
+    driver.execute_script("document.querySelector('input[name=end]').value='2023-01-31'")
+
+    # Select borough and complaint
     Select(driver.find_element(By.NAME, "borough")).select_by_visible_text("BROOKLYN")
-    driver.find_element(By.NAME, "complaint").send_keys("Noise")
+    c = driver.find_element(By.NAME, "complaint")
+    c.clear()
+    c.send_keys("Noise")
+
     driver.find_element(By.CSS_SELECTOR, "button[type=submit]").click()
-    time.sleep(1)
+
+    # Wait for the page to render
+    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
     assert "Results" in driver.page_source
     assert "No results" not in driver.page_source
 
+
 def test_negative_search(driver):
     driver.get(f"{BASE_URL}/")
-    driver.find_element(By.NAME, "start").send_keys("2023-01-01")
-    driver.find_element(By.NAME, "end").send_keys("2023-01-02")
+
+    driver.execute_script("document.querySelector('input[name=start]').value='2023-01-01'")
+    driver.execute_script("document.querySelector('input[name=end]').value='2023-01-02'")
+
     Select(driver.find_element(By.NAME, "borough")).select_by_visible_text("STATEN ISLAND")
-    driver.find_element(By.NAME, "complaint").send_keys("THIS_SHOULD_NOT_MATCH")
+    c = driver.find_element(By.NAME, "complaint")
+    c.clear()
+    c.send_keys("THIS_SHOULD_NOT_MATCH")
+
     driver.find_element(By.CSS_SELECTOR, "button[type=submit]").click()
-    time.sleep(1)
+
+    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
     assert "No results" in driver.page_source
+
 
 def test_aggregate(driver):
     driver.get(f"{BASE_URL}/aggregate/borough")
